@@ -1,4 +1,3 @@
-# flake8: noqa
 from datetime import datetime, timedelta
 
 from django.utils import timezone
@@ -11,6 +10,7 @@ from news.models import Comment, News
 from news.forms import CommentForm
 
 User = get_user_model()
+
 
 class TestHomePage(TestCase):
     HOME_URL = reverse('news:home')
@@ -25,7 +25,7 @@ class TestHomePage(TestCase):
                 date=today - timedelta(days=index)
             )
             for index in range(settings.NEWS_COUNT_ON_HOME_PAGE + 1)
-    )
+        )
 
     def test_news_count(self):
         response = self.client.get(self.HOME_URL)
@@ -40,16 +40,24 @@ class TestHomePage(TestCase):
         sorted_dates = sorted(all_dates, reverse=True)
         self.assertEqual(all_dates, sorted_dates)
 
+
 class TestDetailPage(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.news = News.objects.create(title='Тестовая новость', text='Просто текст.')
+        cls.news = News.objects.create(
+            title='Тестовая новость',
+            text='Просто текст.'
+        )
         cls.detail_url = reverse('news:detail', args=(cls.news.id,))
         cls.author = User.objects.create(username='Комментатор')
         now = timezone.now()
         for index in range(10):
-            comment = Comment(news=cls.news, author=cls.author, text=f'Tекст {index}')
+            comment = Comment(
+                news=cls.news,
+                author=cls.author,
+                text=f'Tекст {index}'
+            )
         comment.created = now + timedelta(days=index)
         comment.save()
 
@@ -63,11 +71,11 @@ class TestDetailPage(TestCase):
         self.assertEqual(all_timestamps, sorted_timestamps)
 
     def test_anonymous_client_has_no_form(self):
-        responce = self.client.get(self.detail_url)
-        self.assertNotIn('form', responce.context)
+        response = self.client.get(self.detail_url)
+        self.assertNotIn('form', response.context)
 
     def test_authorized_client_has_form(self):
         self.client.force_login(self.author)
-        responce = self.client.get(self.detail_url)
-        self.assertIn('form', responce.context)
-        self.assertIsInstance(responce.context['form'], CommentForm)
+        response = self.client.get(self.detail_url)
+        self.assertIn('form', response.context)
+        self.assertIsInstance(response.context['form'], CommentForm)
