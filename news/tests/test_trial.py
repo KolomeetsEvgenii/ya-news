@@ -1,4 +1,3 @@
-# flake8: noqa
 # news/tests/test_trial.py
 from unittest import skip
 
@@ -16,11 +15,11 @@ class TestNews(TestCase):
         cls.news = News.objects.create(
             title=cls.TITLE,
             text=cls.TEXT,
-            )
+        )
 
     @skip("временно отключили тест")
     def test_successful_creation(self):
-            # При помощи обычного ORM-метода посчитаем количество записей в базе.
+        # При помощи обычного ORM-метода посчитаем количество записей в базе.
             news_count = News.objects.count()
             # Сравним полученное число с единицей.
             self.assertEqual(news_count, 1)
@@ -28,7 +27,7 @@ class TestNews(TestCase):
     @skip("временно отключили тест")
     def test_title(self):
         # Сравним свойство объекта и ожидаемое значение.
-        self.assertEqual(self.news.title, self.TITLE) 
+        self.assertEqual(self.news.title, self.TITLE)
 
 
 class Test(TestCase):

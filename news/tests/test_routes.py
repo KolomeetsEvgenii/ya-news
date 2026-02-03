@@ -22,7 +22,7 @@ class TestRoutes(TestCase):
             text='Текст комментария'
         )
 
-    def test_home_page(self):
+    def test_pages_availability(self):
         urls = (
             ('news:home', None),
             ('news:detail', (self.news.id,)),

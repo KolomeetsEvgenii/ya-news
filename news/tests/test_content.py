@@ -58,8 +58,8 @@ class TestDetailPage(TestCase):
                 author=cls.author,
                 text=f'Tекст {index}'
             )
-        comment.created = now + timedelta(days=index)
-        comment.save()
+            comment.created = now + timedelta(days=index)
+            comment.save()
 
     def test_comments_order(self):
         response = self.client.get(self.detail_url)
