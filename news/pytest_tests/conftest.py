@@ -1,11 +1,12 @@
 import pytest
 from datetime import datetime, timedelta
-from django.utils import timezone
+
 from django.conf import settings
-
 from django.test.client import Client
+from django.urls import reverse
+from django.utils import timezone
 
-from news.models import News, Comment
+from news.models import Comment, News
 
 
 @pytest.fixture
@@ -20,10 +21,10 @@ def many_comments(db, author, news):
             text=f'Текст {index}',
         )
         comment.created = start_time + timedelta(days=index)
-        comment.save(update_fields=['created'])
+        comment.save(update_fields=('created',))
         comments.append(comment)
 
-    return comments
+    return tuple(comments)
 
 
 @pytest.fixture
@@ -67,28 +68,51 @@ def not_author_client(not_author):
 
 @pytest.fixture
 def news(db):
-    news = News.objects.create(
+    return News.objects.create(
         title='Заголовок',
         text='Текст новости',
     )
-    return news
 
 
 @pytest.fixture
 def comment(db, author, news):
-    comment = Comment.objects.create(
+    return Comment.objects.create(
         news=news,
         author=author,
-        text='Комментарий'
+        text='Комментарий',
     )
-    return comment
 
 
 @pytest.fixture
-def id_for_args(news):
-    return (news.id,)
+def home_url():
+    return reverse('news:home')
 
 
 @pytest.fixture
-def comment_id_for_args(comment):
-    return (comment.id,)
+def login_url():
+    return reverse('users:login')
+
+
+@pytest.fixture
+def signup_url():
+    return reverse('users:signup')
+
+
+@pytest.fixture
+def logout_url():
+    return reverse('users:logout')
+
+
+@pytest.fixture
+def detail_url(news):
+    return reverse('news:detail', args=(news.id,))
+
+
+@pytest.fixture
+def edit_url(comment):
+    return reverse('news:edit', args=(comment.id,))
+
+
+@pytest.fixture
+def delete_url(comment):
+    return reverse('news:delete', args=(comment.id,))

@@ -1,6 +1,6 @@
-import pytest
 from http import HTTPStatus
-from django.urls import reverse
+
+import pytest
 from pytest_django.asserts import assertRedirects
 
 from news.forms import BAD_WORDS, WARNING
@@ -9,91 +9,116 @@ from news.models import Comment
 pytestmark = pytest.mark.django_db
 
 
-def test_anonymous_user_cant_create_comment(client, news):
-    detail_url = reverse('news:detail', args=(news.id,))
+def test_anonymous_user_cant_create_comment(client, detail_url):
     form_data = {'text': 'Текст комментария'}
 
+    comments_before = Comment.objects.count()
     client.post(detail_url, data=form_data)
+    comments_after = Comment.objects.count()
 
-    assert Comment.objects.count() == 0
+    assert comments_after == comments_before
 
 
-def test_user_can_create_comment(author_client, author, news):
-    detail_url = reverse('news:detail', args=(news.id,))
+def test_user_can_create_comment(author_client, author, news, detail_url):
     form_data = {'text': 'Текст комментария'}
+
+    existing_pks = set(Comment.objects.values_list('pk', flat=True))
 
     response = author_client.post(detail_url, data=form_data)
 
     assertRedirects(response, f'{detail_url}#comments')
-    assert Comment.objects.count() == 1
+    assert Comment.objects.count() == len(existing_pks) + 1
 
-    created_comment = Comment.objects.get()
+    created_comment = Comment.objects.exclude(pk__in=existing_pks).get()
     assert created_comment.text == form_data['text']
     assert created_comment.news == news
     assert created_comment.author == author
 
 
-def test_user_cant_use_bad_words(author_client, news):
-    detail_url = reverse('news:detail', args=(news.id,))
+def test_user_cant_use_bad_words(author_client, detail_url):
     bad_words_data = {'text': f'Какой-то текст, {BAD_WORDS[0]}, еще текст'}
 
+    comments_before = Comment.objects.count()
     response = author_client.post(detail_url, data=bad_words_data)
+    comments_after = Comment.objects.count()
 
-    # Должна вернуться страница с формой и ошибкой валидации
     form = response.context['form']
-    assert 'text' in form.errors
-    assert WARNING in form.errors['text']
-
-    assert Comment.objects.count() == 0
+    assert form.errors['text'] == [WARNING]
+    assert comments_after == comments_before
 
 
-def test_author_can_delete_comment(author_client, news, comment):
-    delete_url = reverse('news:delete', args=(comment.id,))
-    expected_redirect_url = reverse(
-        'news:detail',
-        args=(news.id,)
-    ) + '#comments'
+def test_author_can_delete_comment(
+        author_client,
+        delete_url, detail_url,
+        comment
+):
+    comments_before = Comment.objects.count()
 
     response = author_client.delete(delete_url)
 
     assert response.status_code == HTTPStatus.FOUND
-    assertRedirects(response, expected_redirect_url)
-    assert Comment.objects.count() == 0
+    assertRedirects(response, f'{detail_url}#comments')
+    assert Comment.objects.count() == comments_before - 1
+    assert not Comment.objects.filter(pk=comment.pk).exists()
 
 
-def test_user_cant_delete_comment_of_another_user(not_author_client, comment):
-    delete_url = reverse('news:delete', args=(comment.id,))
+def test_user_cant_delete_comment_of_another_user(
+        not_author_client,
+        delete_url, comment
+):
+    comments_before = Comment.objects.count()
+    comment_state_before = {
+        'pk': comment.pk,
+        'text': comment.text,
+        'author_id': comment.author_id,
+        'news_id': comment.news_id,
+        'created': comment.created,
+    }
 
     response = not_author_client.delete(delete_url)
 
     assert response.status_code == HTTPStatus.NOT_FOUND
-    assert Comment.objects.count() == 1
+    assert Comment.objects.count() == comments_before
+
+    comment_state_after = Comment.objects.values(
+        'pk', 'text', 'author_id', 'news_id', 'created'
+    ).get(pk=comment.pk)
+    assert comment_state_after == comment_state_before
 
 
-def test_author_can_edit_comment(author_client, news, comment):
-    edit_url = reverse('news:edit', args=(comment.id,))
-    expected_redirect_url = reverse(
-        'news:detail',
-        args=(news.id,)
-    ) + '#comments'
+def test_author_can_edit_comment(author_client, edit_url, detail_url, comment):
     form_data = {'text': 'Обновлённый комментарий'}
+    comments_before = Comment.objects.count()
 
     response = author_client.post(edit_url, data=form_data)
 
-    assertRedirects(response, expected_redirect_url)
+    assertRedirects(response, f'{detail_url}#comments')
+    assert Comment.objects.count() == comments_before
 
-    comment.refresh_from_db()
-    assert comment.text == form_data['text']
+    updated_comment = Comment.objects.get(pk=comment.pk)
+    assert updated_comment.text == form_data['text']
 
 
-def test_user_cant_edit_comment_of_another_user(not_author_client, comment):
-    edit_url = reverse('news:edit', args=(comment.id,))
+def test_user_cant_edit_comment_of_another_user(
+        not_author_client,
+        edit_url, comment
+):
     form_data = {'text': 'Обновлённый комментарий'}
-    original_text = comment.text
+    comments_before = Comment.objects.count()
+    comment_state_before = {
+        'pk': comment.pk,
+        'text': comment.text,
+        'author_id': comment.author_id,
+        'news_id': comment.news_id,
+        'created': comment.created,
+    }
 
     response = not_author_client.post(edit_url, data=form_data)
 
     assert response.status_code == HTTPStatus.NOT_FOUND
+    assert Comment.objects.count() == comments_before
 
-    comment.refresh_from_db()
-    assert comment.text == original_text
+    comment_state_after = Comment.objects.values(
+        'pk', 'text', 'author_id', 'news_id', 'created'
+    ).get(pk=comment.pk)
+    assert comment_state_after == comment_state_before
